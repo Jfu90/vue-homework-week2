@@ -106,16 +106,43 @@
         <section v-if="signInState.token">
           <h1>TODOLIST</h1>
           <ul class="list-group">
-            <li class="list-group-item" v-for="todo in todolistDate" :key="todo.id">
-              <input type="checkbox" v-model="todo.status" /> {{ todo.content }}
-              {{ todo.createTime }}
+            <li
+              class="todoItem list-group-item d-flex justify-content-between align-items-center"
+              v-for="todo in todolistDate"
+              :key="todo.id"
+            >
+              <div class="me-auto">
+                <input
+                  type="checkbox"
+                  class="align-middle me-2"
+                  v-model="todo.status"
+                  @change="toggleTodoStatus(todo.id)"
+                />
+                <span v-show="tempTodoThing.id !== todo.id">{{ todo.content }}</span>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-if="tempTodoThing.id === todo.id"
+                  v-model="tempTodoThing.content"
+                  @blur="updateTodos(todo.id)"
+                />
+                {{ todo.createTime }}
+              </div>
+              <div class="todoTools btn-group" role="group">
+                <button type="button" class="btn btn-primary" @click="editTodos(todo.id)">
+                  修改
+                </button>
+                <button type="button" class="btn btn-primary" @click="delTodos(todo.id)">
+                  刪除
+                </button>
+              </div>
             </li>
           </ul>
           <input
             type="text"
             placeholder="todothing"
             class="form-control my-2"
-            v-model="todoThing.content"
+            v-model="newTodoThing"
           />
           <button type="button" class="btn btn-primary me-2" @click="createTodos">新增事項</button>
         </section>
@@ -123,6 +150,15 @@
     </div>
   </main>
 </template>
+
+<style>
+.todoItem:hover .todoTools {
+  visibility: visible;
+}
+.todoTools {
+  visibility: hidden;
+}
+</style>
 
 <script setup>
 import axios from 'axios'
@@ -181,6 +217,7 @@ const signIn = async () => {
     document.cookie = `;expires=${signInState.value.exp}`
   } catch (error) {
     responseMsg.value.message = `登入失敗 ERROR: ${error.response.data.message}`
+    signInDate.value.password = ''
   }
 }
 
@@ -237,7 +274,9 @@ const signOut = async () => {
 
 // todolist
 const todolistDate = ref([])
-const todoThing = ref({
+const newTodoThing = ref('')
+const tempTodoThing = ref({
+  id: '',
   content: ''
 })
 
@@ -249,22 +288,95 @@ const getTodos = async () => {
       }
     })
     todolistDate.value = response.data.data
+    console.log('todo run')
   } catch (error) {
     console.log(error.response.data)
   }
 }
 
 const createTodos = async () => {
+  if (newTodoThing.value) {
+    try {
+      await axios.post(
+        `${apiBase.value}/todos/`,
+        {
+          content: newTodoThing.value
+        },
+        {
+          headers: {
+            Authorization: signInState.value.token
+          }
+        }
+      )
+      newTodoThing.value = ''
+      getTodos()
+    } catch (error) {
+      console.log(error.response.data)
+    }
+  } else {
+    // 沒有填寫代辦事項
+  }
+}
+
+const editTodos = async (id) => {
+  const idx = todolistDate.value.findIndex((item) => item.id === id)
+  tempTodoThing.value = {
+    id: id,
+    content: todolistDate.value[idx].content
+  }
+}
+
+const updateTodos = async (id) => {
+  if (tempTodoThing.value) {
+    try {
+      await axios.put(
+        `${apiBase.value}/todos/${id}`,
+        {
+          content: tempTodoThing.value.content
+        },
+        {
+          headers: {
+            Authorization: signInState.value.token
+          }
+        }
+      )
+      tempTodoThing.value = ''
+      getTodos()
+    } catch (error) {
+      console.log(error.response.data)
+    }
+  } else {
+    // 沒有填寫代辦事項
+  }
+}
+
+const delTodos = async (id) => {
   try {
-    await axios.post(`${apiBase.value}/todos/`, todoThing.value, {
+    await axios.delete(`${apiBase.value}/todos/${id}`, {
       headers: {
         Authorization: signInState.value.token
       }
     })
-    todoThing.value.content = ''
     getTodos()
   } catch (error) {
-    console.log(error.response.data)
+    console.log(error)
+  }
+}
+
+const toggleTodoStatus = async (id) => {
+  try {
+    await axios.patch(
+      `${apiBase.value}/todos/${id}/toggle`,
+      {},
+      {
+        headers: {
+          Authorization: signInState.value.token
+        }
+      }
+    )
+    getTodos()
+  } catch (error) {
+    console.log(error)
   }
 }
 
